@@ -13,4 +13,5 @@ urlpatterns = [
     path('delete/<int:id>', delete, name="delete"),
     path('tag/', tag_list, name="tag_list"),
     path('tag/<int:tag_id>', tag_blogs, name="tag_blogs"),
+    path('find/', find, name="find"),
 ]

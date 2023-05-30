@@ -1,6 +1,8 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from .models import Blog, Comment, Tag
 from django.utils import timezone
+from django.db.models import Q
+from itertools import chain
 
 
 def detail(request, id):
@@ -9,18 +11,28 @@ def detail(request, id):
         comments = Comment.objects.filter(blog=blog)
         return render(request, 'main/detail.html', {
             'blog':blog, 
-            'comments':comments,})
+            'comments':comments,
+            })
     elif request.method == "POST":
         new_comment = Comment()
-        
         new_comment.blog = blog
-
         new_comment.writer = request.user
         new_comment.content = request.POST['content']
         new_comment.pub_date = timezone.now()
         
-        
         new_comment.save()
+
+        words = new_comment.content.split('  ')
+
+        tag_list = []
+        for w in words:
+            if len(w) > 0:
+                if w[0] == '#':
+                    tag_list.append(w[1:])
+        for t in tag_list:
+            tag, boolean = Tag.objects.get_or_create(name=t)
+            new_comment.tags.add(tag.id)
+
         return redirect('main:detail', id)
 
 def create(request):
@@ -100,5 +112,25 @@ def tag_list(request):
 
 def tag_blogs(request, tag_id):
     tag = get_object_or_404(Tag, id=tag_id)
-    blogs = tag.blogs.all()
-    return render(request, 'main/tag_blogs.html', {'tag':tag, 'blogs':blogs,})
+    blogs = Blog.objects.filter(tags=tag)
+    comments = Comment.objects.filter(content__contains=f'#{tag.name}')
+    return render(request, 'main/tag_blogs.html', {
+        'tag':tag, 
+        'blogs':blogs, 
+        'comments':comments,
+        })
+
+from itertools import chain
+
+def find(request):
+    find_tag = request.GET['find']
+    tag = get_object_or_404(Tag, name=find_tag)
+    blogs_with_content_tags = Blog.objects.filter(tags=tag.pk)
+    blogs_with_comment_tags = Blog.objects.filter(comment__tags=tag.pk)
+
+    blogs = blogs_with_content_tags.union(blogs_with_comment_tags)
+    return render(request, 'main/tag_blogs.html', {
+        'tag' :tag,
+        'blogs' : blogs,
+    })
+
